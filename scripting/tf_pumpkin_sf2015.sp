@@ -6,7 +6,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.1.0"
+#define PLUGIN_VERSION "0.2.0"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -21,6 +21,7 @@ int g_pumpkinBombSounds[] = { 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15 };
 #define SOUND_PUMPKIN_BOMB_EXPLODE_FMT "vo/halloween_merasmus/hall2015_pumpbombboom_%02d.mp3"
 int g_pumpkinBombExplodeSounds[] = { 1, 2, 3, 4, 5, 6, 7 };
 
+// Particle effect added to the pumpkin.
 #define HAUNTED_PUMPKIN_FX "unusual_spellbook_circle_green"
 
 #define HAUNTED_PUMPKIN_TARGET_PREFIX "haunted_pumpkin"
@@ -39,10 +40,12 @@ ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple;
 public void OnPluginStart() {
 	HookEvent("player_death", Event_PlayerDeath_HauntedPumpkin);
 	
-	CreateConVar("sm_hpumpkin_version", PLUGIN_VERSION, "Version of Haunted Pumpkins.", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	CreateConVar("sm_hpumpkin_version", PLUGIN_VERSION, "Version of Haunted Pumpkins.", FCVAR_PLUGIN | FCVAR_NOTIFY | FCVAR_DONTRECORD);
 	
 	g_ConVarHauntingRate = CreateConVar("sm_hpumpkin_spawn_rate", "0.1", "Probability that a given pumpkin bomb will spawn haunted.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
 	g_ConVarAllowMultiple = CreateConVar("sm_hpumpkin_allow_multiple", "0", "Whether or not multiple haunted pumpkins are allowed to spawn.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	
+	AutoExecConfig(true);
 }
 
 public void OnPluginEnd() {
@@ -230,15 +233,17 @@ public Action Event_PlayerDeath_HauntedPumpkin(Handle event, const char[] name, 
 	int inflictor = GetEventInt(event, "inflictor_entindex");
 	int victim = GetClientOfUserId(GetEventInt(event, "userid"));
 	
-	char classname[64];
-	GetEntityClassname(inflictor, classname, sizeof(classname));
-	
-	if (StrEqual(classname, "tf_pumpkin_bomb", false)) {
-		char targetname[64];
-		GetEntPropString(inflictor, Prop_Data, "m_iName", targetname, sizeof(targetname));
+	if (IsValidEntity(inflictor)) {
+		char classname[64];
+		GetEntityClassname(inflictor, classname, sizeof(classname));
 		
-		if (StrContains(targetname, HAUNTED_PUMPKIN_TARGET_PREFIX, false) > -1) {
-			// TODO attempt to match voice line with damage event?
+		if (StrEqual(classname, "tf_pumpkin_bomb", false)) {
+			char targetname[64];
+			GetEntPropString(inflictor, Prop_Data, "m_iName", targetname, sizeof(targetname));
+			
+			if (StrContains(targetname, HAUNTED_PUMPKIN_TARGET_PREFIX, false) > -1) {
+				// TODO attempt to match voice line with damage event?
+			}
 		}
 	}
 }
