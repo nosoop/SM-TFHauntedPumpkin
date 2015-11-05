@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.3.0"
+#define PLUGIN_VERSION "0.3.1"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -24,9 +24,9 @@ int g_pumpkinBombExplodeSounds[] = { 1, 2, 3, 4, 5, 6, 7 };
 
 // Particle effect added to the pumpkin.
 char g_HauntedPumpkinParticleNames[][] = {
-	"unusual_spellbook_circle_green", // neutral
-	"teleporter_red_exit", // red
-	"teleporter_blue_exit" // blue
+	"unusual_mystery_parent_green", // neutral
+	"player_recent_teleport_red", // red
+	"player_recent_teleport_blue" // blue
 };
 
 #define HAUNTED_PUMPKIN_TARGET_PREFIX "haunted_pumpkin"
@@ -159,12 +159,10 @@ void HauntPumpkin(int pumpkin) {
 		
 		/**
 		 * Neutral pumpkin bomb's particle effect applies over the top of its head;
-		 * team colored ones have their effect closer to the ground.
+		 * team colored ones are on the ground.
 		 */
 		if (pumpkinTeam == TFTeam_Unassigned) {
 			particleOrigin[2] += 12.0;
-		} else {
-			particleOrigin[2] -= 10.0;
 		}
 		TeleportEntity(particle, particleOrigin, NULL_VECTOR, NULL_VECTOR);
 		
