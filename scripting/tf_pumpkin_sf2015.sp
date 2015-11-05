@@ -3,10 +3,11 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <tf2>
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.2.0"
+#define PLUGIN_VERSION "0.3.0"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -22,7 +23,11 @@ int g_pumpkinBombSounds[] = { 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15 };
 int g_pumpkinBombExplodeSounds[] = { 1, 2, 3, 4, 5, 6, 7 };
 
 // Particle effect added to the pumpkin.
-#define HAUNTED_PUMPKIN_FX "unusual_spellbook_circle_green"
+char g_HauntedPumpkinParticleNames[][] = {
+	"unusual_spellbook_circle_green", // neutral
+	"teleporter_red_exit", // red
+	"teleporter_blue_exit" // blue
+};
 
 #define HAUNTED_PUMPKIN_TARGET_PREFIX "haunted_pumpkin"
 #define HAUNTED_PARTICLE_TARGET "haunted_pumpkin_fx"
@@ -136,16 +141,32 @@ void HauntPumpkin(int pumpkin) {
 	char pumpkinTarget[64];
 	Format(pumpkinTarget, sizeof(pumpkinTarget), HAUNTED_PUMPKIN_TARGET_PREFIX ... "_%d", g_nHauntedPumpkinsSpawned++);
 	
-	int particle = CreateParticle(HAUNTED_PUMPKIN_FX);
+	TFTeam pumpkinTeam = GetPumpkinTeam(pumpkin);
+	
+	int iParticleEffect = 0;
+	switch(pumpkinTeam) {
+		case TFTeam_Red: { iParticleEffect = 1; }
+		case TFTeam_Blue: { iParticleEffect = 2; }
+	}
+	
+	int particle = CreateParticle(g_HauntedPumpkinParticleNames[iParticleEffect]);
 	if (IsValidEdict(particle)) {
 		DispatchKeyValue(pumpkin, "targetname", pumpkinTarget);
 		DispatchKeyValue(particle, "targetname", HAUNTED_PARTICLE_TARGET);
 		
-		float origin[3];
-		GetEntPropVector(pumpkin, Prop_Send, "m_vecOrigin", origin);
+		float particleOrigin[3];
+		GetEntPropVector(pumpkin, Prop_Send, "m_vecOrigin", particleOrigin);
 		
-		origin[2] += 12.0;
-		TeleportEntity(particle, origin, NULL_VECTOR, NULL_VECTOR);
+		/**
+		 * Neutral pumpkin bomb's particle effect applies over the top of its head;
+		 * team colored ones have their effect closer to the ground.
+		 */
+		if (pumpkinTeam == TFTeam_Unassigned) {
+			particleOrigin[2] += 12.0;
+		} else {
+			particleOrigin[2] -= 10.0;
+		}
+		TeleportEntity(particle, particleOrigin, NULL_VECTOR, NULL_VECTOR);
 		
 		DispatchKeyValue(particle, "parentname", pumpkinTarget);
 		
@@ -156,10 +177,25 @@ void HauntPumpkin(int pumpkin) {
 		PreparePumpkinTalkTimer(pumpkin);
 		
 		SetEntityModel(pumpkin, HAUNTED_PUMPKIN_MODEL);
-		SetEntPropFloat(pumpkin, Prop_Data, "m_flModelScale", 0.55);
+		
+		// MIRV pumpkin bombs are slightly smaller than their standard counterparts.
+		float flModelScale = pumpkinTeam == TFTeam_Unassigned ? 0.55 : (0.9 * 0.55);
+		SetEntPropFloat(pumpkin, Prop_Data, "m_flModelScale", flModelScale);
 		
 		AcceptEntityInput(pumpkin, "DisableShadow");
 	}
+}
+
+/**
+ * Returns the pumpkin spawner's team.
+ */
+TFTeam GetPumpkinTeam(int pumpkin) {
+	// TODO is there a better way to get the pumpkin's team?  iTeamNum is 0, hOwnerEntity doesn't exist...
+	switch (GetEntProp(pumpkin, Prop_Data, "m_nSkin")) {
+		case 1: { return TFTeam_Red; }
+		case 2: { return TFTeam_Blue; }
+	}
+	return TFTeam_Unassigned;
 }
 
 int CreateParticle(const char[] effectName) {
