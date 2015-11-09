@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.3.1"
+#define PLUGIN_VERSION "0.4.0"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -40,7 +40,7 @@ char g_HauntedPumpkinParticleNames[][] = {
 // Identifies a specific pumpkin for the particle attachment
 int g_nHauntedPumpkinsSpawned;
 
-ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple;
+ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple, g_ConVarHauntTeams;
 
 public void OnPluginStart() {
 	HookEvent("player_death", Event_PlayerDeath_HauntedPumpkin);
@@ -49,6 +49,7 @@ public void OnPluginStart() {
 	
 	g_ConVarHauntingRate = CreateConVar("sm_hpumpkin_spawn_rate", "0.1", "Probability that a given pumpkin bomb will spawn haunted.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
 	g_ConVarAllowMultiple = CreateConVar("sm_hpumpkin_allow_multiple", "0", "Whether or not multiple haunted pumpkins are allowed to spawn.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	g_ConVarHauntTeams = CreateConVar("sm_hpumpkin_haunt_teams", "1", "Whether or not team-colored pumpkin bombs (e.g., from the Pumpkin MIRV spell) can be haunted.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
 	
 	AutoExecConfig(true);
 }
@@ -101,20 +102,29 @@ public void OnEntityCreated(int entity, const char[] classname) {
 	}
 }
 
+/**
+ * Prepares to attempt pumpkin transformation when the entity is spawned.
+ */
 public void SDKHook_SpawnPost_HauntedPumpkin(int pumpkin) {
-	CheckSpawnAsHauntedPumpkin(pumpkin);
+	/**
+	 * The SpawnPost hook might fire before the map is fully loaded, but the following error
+	 * will be thrown if we try to spawn an entity (such as the particle effect) during that time:
+	 * "Cannot create new entity when no map is running"
+	 * 
+	 * We'll just attempt to haunt pumpkins once there's at least one player in-game.
+	 */
+	if (GameRules_GetRoundState() > RoundState_Pregame) {
+		CheckSpawnAsHauntedPumpkin(pumpkin);
+	}
 }
 
 /**
- * Determine whether a pumpkin bomb is allowed to be haunted.
+ * Determine whether or not a pumpkin bomb is allowed to be haunted.
  */
 void CheckSpawnAsHauntedPumpkin(int pumpkin) {
-	if (GameRules_GetRoundState() < RoundState_StartGame) {
-		// Can't spawn entities before the map is done initializing:
-		// "Cannot create new entity when no map is running"
-		return;
-	} else if (GetRandomFloat() < g_ConVarHauntingRate.FloatValue
-			&& (g_ConVarAllowMultiple.BoolValue || !DoesHauntedPumpkinExist())) {
+	if (GetRandomFloat() < g_ConVarHauntingRate.FloatValue
+			&& (g_ConVarHauntTeams.BoolValue || GetPumpkinTeam(pumpkin) == TFTeam_Unassigned)
+			&& (g_ConVarAllowMultiple.BoolValue || !DoesHauntedPumpkinExist()) ) {
 		HauntPumpkin(pumpkin);
 	}
 }
@@ -158,7 +168,7 @@ void HauntPumpkin(int pumpkin) {
 		GetEntPropVector(pumpkin, Prop_Send, "m_vecOrigin", particleOrigin);
 		
 		/**
-		 * Neutral pumpkin bomb's particle effect applies over the top of its head;
+		 * Neutral pumpkin bombs' particle effects applies over the top of its head;
 		 * team colored ones are on the ground.
 		 */
 		if (pumpkinTeam == TFTeam_Unassigned) {
