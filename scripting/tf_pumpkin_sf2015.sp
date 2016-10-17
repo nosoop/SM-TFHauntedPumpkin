@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.4.0"
+#define PLUGIN_VERSION "0.4.1"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -228,7 +228,10 @@ public Action SDKHook_OnHauntedPumpkinDestroyed(int pumpkin, int &attacker, int 
 	char sample[PLATFORM_MAX_PATH];
 	GetGameSoundSample("sf15.Pumpkin.Bomb.Explode", sample, sizeof(sample));
 	EmitSoundToAll(sample, pumpkin, _, SNDLEVEL_GUNFIRE);
-	EmitSoundToClient(attacker, sample);
+	
+	if (attacker && attacker <= MaxClients && IsClientInGame(attacker)) {
+		EmitSoundToClient(attacker, sample);
+	}
 }
 
 /**
