@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.4.1"
+#define PLUGIN_VERSION "0.4.2"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -45,11 +45,11 @@ ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple, g_ConVarHauntTeams;
 public void OnPluginStart() {
 	HookEvent("player_death", Event_PlayerDeath_HauntedPumpkin);
 	
-	CreateConVar("sm_hpumpkin_version", PLUGIN_VERSION, "Version of Haunted Pumpkins.", FCVAR_PLUGIN | FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("sm_hpumpkin_version", PLUGIN_VERSION, "Version of Haunted Pumpkins.", FCVAR_NOTIFY | FCVAR_DONTRECORD);
 	
-	g_ConVarHauntingRate = CreateConVar("sm_hpumpkin_spawn_rate", "0.1", "Probability that a given pumpkin bomb will spawn haunted.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
-	g_ConVarAllowMultiple = CreateConVar("sm_hpumpkin_allow_multiple", "0", "Whether or not multiple haunted pumpkins are allowed to spawn.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
-	g_ConVarHauntTeams = CreateConVar("sm_hpumpkin_haunt_teams", "1", "Whether or not team-colored pumpkin bombs (e.g., from the Pumpkin MIRV spell) can be haunted.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	g_ConVarHauntingRate = CreateConVar("sm_hpumpkin_spawn_rate", "0.1", "Probability that a given pumpkin bomb will spawn haunted.", _, true, 0.0, true, 1.0);
+	g_ConVarAllowMultiple = CreateConVar("sm_hpumpkin_allow_multiple", "0", "Whether or not multiple haunted pumpkins are allowed to spawn.", _, true, 0.0, true, 1.0);
+	g_ConVarHauntTeams = CreateConVar("sm_hpumpkin_haunt_teams", "1", "Whether or not team-colored pumpkin bombs (e.g., from the Pumpkin MIRV spell) can be haunted.", _, true, 0.0, true, 1.0);
 	
 	AutoExecConfig(true);
 }
@@ -297,7 +297,7 @@ public Action Event_PlayerDeath_HauntedPumpkin(Handle event, const char[] name, 
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
 	if (GetEngineVersion() != Engine_TF2) {
-		Format(error, err_max, "This plug-in only works for Team Fortress 2.");
+		strcopy(error, err_max, "This plug-in only works for Team Fortress 2.");
 		return APLRes_Failure;
 	}
 	return APLRes_Success;
