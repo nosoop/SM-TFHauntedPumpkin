@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.4.2"
+#define PLUGIN_VERSION "0.4.3"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -244,21 +244,21 @@ Handle PreparePumpkinTalkTimer(int pumpkin) {
 	char targetname[64];
 	GetEntPropString(pumpkin, Prop_Data, "m_iName", targetname, sizeof(targetname));
 	
-	Handle datapack;
-	Handle timer = CreateDataTimer(delay, Timer_PumpkinTalk, datapack, TIMER_FLAG_NO_MAPCHANGE);
+	DataPack data;
+	Handle timer = CreateDataTimer(delay, Timer_PumpkinTalk, data, TIMER_FLAG_NO_MAPCHANGE);
 	
-	WritePackCell(datapack, pumpkin);
-	WritePackString(datapack, targetname);
+	data.WriteCell(pumpkin);
+	data.WriteString(targetname);
 	
 	return timer;
 }
 
-public Action Timer_PumpkinTalk(Handle timer, any datapack) {
-	ResetPack(datapack);
-	int pumpkin = view_as<int>(ReadPackCell(datapack));
+public Action Timer_PumpkinTalk(Handle timer, DataPack data) {
+	data.Reset();
+	int pumpkin = data.ReadCell();
 	
 	char packedname[64];
-	ReadPackString(datapack, packedname, sizeof(packedname));
+	data.ReadString(packedname, sizeof(packedname));
 	
 	if (IsValidEntity(pumpkin)) {
 		char classname[64], targetname[64];
@@ -276,9 +276,9 @@ public Action Timer_PumpkinTalk(Handle timer, any datapack) {
 	}
 }
 
-public Action Event_PlayerDeath_HauntedPumpkin(Handle event, const char[] name, bool dontBroadcast) {
-	int inflictor = GetEventInt(event, "inflictor_entindex");
-	int victim = GetClientOfUserId(GetEventInt(event, "userid"));
+public void Event_PlayerDeath_HauntedPumpkin(Event event, const char[] name, bool dontBroadcast) {
+	int inflictor = event.GetInt("inflictor_entindex");
+	int victim = GetClientOfUserId(event.GetInt("userid"));
 	
 	if (IsValidEntity(inflictor)) {
 		char classname[64];
