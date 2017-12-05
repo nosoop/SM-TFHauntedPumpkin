@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.4.4"
+#define PLUGIN_VERSION "0.4.5"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -19,6 +19,7 @@ public Plugin myinfo = {
 // Sounds to precache
 #define SOUND_PUMPKIN_BOMB_FMT "vo/halloween_merasmus/hall2015_pumpbomb_%02d.mp3"
 int g_pumpkinBombSounds[] = { 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15 };
+
 #define SOUND_PUMPKIN_BOMB_EXPLODE_FMT "vo/halloween_merasmus/hall2015_pumpbombboom_%02d.mp3"
 int g_pumpkinBombExplodeSounds[] = { 1, 2, 3, 4, 5, 6, 7 };
 
@@ -67,7 +68,7 @@ public void OnMapStart() {
 	int nRehauntedPumpkins = 0;
 	
 	// For some reason, we cannot use the native game sound precache method (PrecacheScriptSound),
-	// so we'll just have to hardcode the cache.
+	// so we'll just have to use hardcoded sound paths.
 	char gameSounds[PLATFORM_MAX_PATH];
 	for (int i = 0; i < sizeof(g_pumpkinBombSounds); i++) {
 		Format(gameSounds, sizeof(gameSounds), SOUND_PUMPKIN_BOMB_FMT, g_pumpkinBombSounds[i]);
@@ -176,7 +177,7 @@ void HauntPumpkin(int pumpkin) {
 		SetVariantString("!activator");
 		AcceptEntityInput(particle, "SetParent", pumpkin, particle, 0);
 		
-		SDKHook(pumpkin, SDKHook_OnTakeDamage, SDKHook_OnHauntedPumpkinDestroyed);
+		SDKHook(pumpkin, SDKHook_OnTakeDamagePost, SDKHook_OnHauntedPumpkinDestroyed);
 		PreparePumpkinTalkTimer(pumpkin);
 		
 		SetEntityModel(pumpkin, HAUNTED_PUMPKIN_MODEL);
@@ -217,9 +218,8 @@ int CreateParticle(const char[] effectName) {
 /**
  * Play the haunted pumpkin explosion sound when hit.
  */
-public Action SDKHook_OnHauntedPumpkinDestroyed(int pumpkin, int &attacker, int &inflictor, float &damage, int &damagetype) {
-	SDKUnhook(pumpkin, SDKHook_OnTakeDamage, SDKHook_OnHauntedPumpkinDestroyed);
-	
+public void SDKHook_OnHauntedPumpkinDestroyed(int pumpkin, int attacker, int inflictor,
+		float damage, int damagetype) {
 	char sample[PLATFORM_MAX_PATH];
 	GetGameSoundSample("sf15.Pumpkin.Bomb.Explode", sample, sizeof(sample));
 	EmitSoundToAll(sample, pumpkin, _, SNDLEVEL_GUNFIRE);
