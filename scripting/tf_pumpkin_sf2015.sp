@@ -7,13 +7,13 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.4.3"
+#define PLUGIN_VERSION "0.4.4"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
     description = "Randomly gives a pumpkin the spirit of the Medic's little monster from the Scream Fortress 7 comic.",
     version = PLUGIN_VERSION,
-    url = "https://github.com/nosoop"
+    url = "https://github.com/nosoop/SM-TFHauntedPumpkin"
 }
 
 // Sounds to precache
@@ -29,16 +29,13 @@ char g_HauntedPumpkinParticleNames[][] = {
 	"player_recent_teleport_blue" // blue
 };
 
-#define HAUNTED_PUMPKIN_TARGET_PREFIX "haunted_pumpkin"
+#define HAUNTED_PUMPKIN_TARGET "haunted_pumpkin"
 #define HAUNTED_PARTICLE_TARGET "haunted_pumpkin_fx"
 
 #define PUMPKIN_TALK_INTERVAL_MIN 3.0
 #define PUMPKIN_TALK_INTERVAL_MAX 15.0
 
 #define HAUNTED_PUMPKIN_MODEL "models/props_halloween/jackolantern_01.mdl"
-
-// Identifies a specific pumpkin for the particle attachment
-int g_nHauntedPumpkinsSpawned;
 
 ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple, g_ConVarHauntTeams;
 
@@ -67,9 +64,10 @@ public void OnPluginEnd() {
 }
 
 public void OnMapStart() {
-	g_nHauntedPumpkinsSpawned = 0;
+	int nRehauntedPumpkins = 0;
 	
-	// For some reason, we cannot use the native game sound precache method, so we'll just have to hardcode the cache.
+	// For some reason, we cannot use the native game sound precache method (PrecacheScriptSound),
+	// so we'll just have to hardcode the cache.
 	char gameSounds[PLATFORM_MAX_PATH];
 	for (int i = 0; i < sizeof(g_pumpkinBombSounds); i++) {
 		Format(gameSounds, sizeof(gameSounds), SOUND_PUMPKIN_BOMB_FMT, g_pumpkinBombSounds[i]);
@@ -87,12 +85,14 @@ public void OnMapStart() {
 	char targetname[64];
 	while ((pumpkin = FindEntityByClassname(pumpkin, "tf_pumpkin_bomb")) != -1) {
 		GetEntPropString(pumpkin, Prop_Data, "m_iName", targetname, sizeof(targetname));
-		if (StrContains(targetname, HAUNTED_PUMPKIN_TARGET_PREFIX, false) > -1) {
+		if (StrEqual(targetname, HAUNTED_PUMPKIN_TARGET)) {
 			HauntPumpkin(pumpkin);
+			nRehauntedPumpkins++;
 		}
 	}
-	if (g_nHauntedPumpkinsSpawned > 0) {
-		LogMessage("%d pumpkin(s) are now haunted.", g_nHauntedPumpkinsSpawned);
+	
+	if (nRehauntedPumpkins) {
+		LogMessage("%d pumpkin(s) are now haunted.", nRehauntedPumpkins);
 	}
 }
 
@@ -137,7 +137,7 @@ bool DoesHauntedPumpkinExist() {
 	char targetname[64];
 	while ((pumpkin = FindEntityByClassname(pumpkin, "tf_pumpkin_bomb")) != -1) {
 		GetEntPropString(pumpkin, Prop_Data, "m_iName", targetname, sizeof(targetname));
-		if (StrContains(targetname, HAUNTED_PUMPKIN_TARGET_PREFIX, false) > -1) {
+		if (StrEqual(targetname, HAUNTED_PUMPKIN_TARGET)) {
 			return true;
 		}
 	}
@@ -148,20 +148,17 @@ bool DoesHauntedPumpkinExist() {
  * Turns a pumpkin bomb into a haunted pumpkin bomb (model change, particle effect, sound timer, damage hook).
  */
 void HauntPumpkin(int pumpkin) {
-	char pumpkinTarget[64];
-	Format(pumpkinTarget, sizeof(pumpkinTarget), HAUNTED_PUMPKIN_TARGET_PREFIX ... "_%d", g_nHauntedPumpkinsSpawned++);
-	
 	TFTeam pumpkinTeam = GetPumpkinTeam(pumpkin);
 	
 	int iParticleEffect = 0;
-	switch(pumpkinTeam) {
+	switch (pumpkinTeam) {
 		case TFTeam_Red: { iParticleEffect = 1; }
 		case TFTeam_Blue: { iParticleEffect = 2; }
 	}
 	
 	int particle = CreateParticle(g_HauntedPumpkinParticleNames[iParticleEffect]);
 	if (IsValidEdict(particle)) {
-		DispatchKeyValue(pumpkin, "targetname", pumpkinTarget);
+		DispatchKeyValue(pumpkin, "targetname", HAUNTED_PUMPKIN_TARGET);
 		DispatchKeyValue(particle, "targetname", HAUNTED_PARTICLE_TARGET);
 		
 		float particleOrigin[3];
@@ -176,10 +173,8 @@ void HauntPumpkin(int pumpkin) {
 		}
 		TeleportEntity(particle, particleOrigin, NULL_VECTOR, NULL_VECTOR);
 		
-		DispatchKeyValue(particle, "parentname", pumpkinTarget);
-		
-		SetVariantString(pumpkinTarget);
-		AcceptEntityInput(particle, "SetParent", particle, particle, 0);
+		SetVariantString("!activator");
+		AcceptEntityInput(particle, "SetParent", pumpkin, particle, 0);
 		
 		SDKHook(pumpkin, SDKHook_OnTakeDamage, SDKHook_OnHauntedPumpkinDestroyed);
 		PreparePumpkinTalkTimer(pumpkin);
@@ -235,45 +230,26 @@ public Action SDKHook_OnHauntedPumpkinDestroyed(int pumpkin, int &attacker, int 
 }
 
 /**
- * Sets a timer for the next haunted pumpkin voice line.
- * The data timer validates the pumpkin according to targetname.
+ * Sets a timer for the next voice line to come from a specific pumpkin.
  */
-Handle PreparePumpkinTalkTimer(int pumpkin) {
+void PreparePumpkinTalkTimer(int pumpkin) {
 	float delay = GetRandomFloat(PUMPKIN_TALK_INTERVAL_MIN, PUMPKIN_TALK_INTERVAL_MAX);
 	
-	char targetname[64];
-	GetEntPropString(pumpkin, Prop_Data, "m_iName", targetname, sizeof(targetname));
-	
-	DataPack data;
-	Handle timer = CreateDataTimer(delay, Timer_PumpkinTalk, data, TIMER_FLAG_NO_MAPCHANGE);
-	
-	data.WriteCell(pumpkin);
-	data.WriteString(targetname);
-	
-	return timer;
+	CreateTimer(delay, Timer_PumpkinTalk, EntIndexToEntRef(pumpkin), TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action Timer_PumpkinTalk(Handle timer, DataPack data) {
-	data.Reset();
-	int pumpkin = data.ReadCell();
-	
-	char packedname[64];
-	data.ReadString(packedname, sizeof(packedname));
+public Action Timer_PumpkinTalk(Handle timer, int pumpkinref) {
+	int pumpkin = EntRefToEntIndex(pumpkinref);
 	
 	if (IsValidEntity(pumpkin)) {
-		char classname[64], targetname[64];
-		GetEntPropString(pumpkin, Prop_Data, "m_iName", targetname, sizeof(targetname));
+		char sample[PLATFORM_MAX_PATH];
 		
-		GetEntityClassname(pumpkin, classname, sizeof(classname));
-		if (StrEqual(classname, "tf_pumpkin_bomb", false) && StrEqual(packedname, targetname, false)) {
-			char sample[PLATFORM_MAX_PATH];
-			
-			GetGameSoundSample("sf15.Pumpkin.Bomb", sample, sizeof(sample));
-			EmitSoundToAll(sample, pumpkin, _, SNDLEVEL_GUNFIRE);
-			
-			PreparePumpkinTalkTimer(pumpkin);
-		}
+		GetGameSoundSample("sf15.Pumpkin.Bomb", sample, sizeof(sample));
+		EmitSoundToAll(sample, pumpkin, _, SNDLEVEL_GUNFIRE);
+		
+		PreparePumpkinTalkTimer(pumpkin);
 	}
+	return Plugin_Handled;
 }
 
 public void Event_PlayerDeath_HauntedPumpkin(Event event, const char[] name, bool dontBroadcast) {
@@ -288,7 +264,7 @@ public void Event_PlayerDeath_HauntedPumpkin(Event event, const char[] name, boo
 			char targetname[64];
 			GetEntPropString(inflictor, Prop_Data, "m_iName", targetname, sizeof(targetname));
 			
-			if (StrContains(targetname, HAUNTED_PUMPKIN_TARGET_PREFIX, false) > -1) {
+			if (StrEqual(targetname, HAUNTED_PUMPKIN_TARGET)) {
 				// TODO attempt to match voice line with damage event?
 			}
 		}
