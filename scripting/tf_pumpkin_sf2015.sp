@@ -7,7 +7,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.4.5"
+#define PLUGIN_VERSION "0.4.5-custom-model"
 public Plugin myinfo = {
     name = "[TF2] Haunted Pumpkins (Scream Fortress 7)",
     author = "nosoop",
@@ -36,9 +36,11 @@ char g_HauntedPumpkinParticleNames[][] = {
 #define PUMPKIN_TALK_INTERVAL_MIN 3.0
 #define PUMPKIN_TALK_INTERVAL_MAX 15.0
 
-#define HAUNTED_PUMPKIN_MODEL "models/props_halloween/jackolantern_01.mdl"
+#define HAUNTED_PUMPKIN_MODEL "models/props_halloween/jackolantern_01"
 
-ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple, g_ConVarHauntTeams;
+char g_PumpkinModel[PLATFORM_MAX_PATH];
+
+ConVar g_ConVarHauntingRate, g_ConVarAllowMultiple, g_ConVarHauntTeams, g_ConVarCustomModel;
 
 public void OnPluginStart() {
 	HookEvent("player_death", Event_PlayerDeath_HauntedPumpkin);
@@ -48,6 +50,7 @@ public void OnPluginStart() {
 	g_ConVarHauntingRate = CreateConVar("sm_hpumpkin_spawn_rate", "0.1", "Probability that a given pumpkin bomb will spawn haunted.", _, true, 0.0, true, 1.0);
 	g_ConVarAllowMultiple = CreateConVar("sm_hpumpkin_allow_multiple", "0", "Whether or not multiple haunted pumpkins are allowed to spawn.", _, true, 0.0, true, 1.0);
 	g_ConVarHauntTeams = CreateConVar("sm_hpumpkin_haunt_teams", "1", "Whether or not team-colored pumpkin bombs (e.g., from the Pumpkin MIRV spell) can be haunted.", _, true, 0.0, true, 1.0);
+	g_ConVarCustomModel = CreateConVar("sm_hpumpkin_model", HAUNTED_PUMPKIN_MODEL, "Model applied to the pumpkin bomb (without the .mdl extension).  Takes effect after configurations are reloaded (after map change).");
 	
 	AutoExecConfig(true);
 }
@@ -79,8 +82,6 @@ public void OnMapStart() {
 		PrecacheSound(gameSounds);
 	}
 	
-	PrecacheModel(HAUNTED_PUMPKIN_MODEL, true);
-	
 	// Rehaunt any existing haunted pumpkins in the event that the plugin was reloaded
 	int pumpkin = -1;
 	char targetname[64];
@@ -95,6 +96,32 @@ public void OnMapStart() {
 	if (nRehauntedPumpkins) {
 		LogMessage("%d pumpkin(s) are now haunted.", nRehauntedPumpkins);
 	}
+}
+
+public void OnConfigsExecuted() {
+	char baseName[PLATFORM_MAX_PATH], downloadFile[PLATFORM_MAX_PATH];
+	g_ConVarCustomModel.GetString(baseName, sizeof(baseName));
+	
+	Format(downloadFile, sizeof(downloadFile), "%s%s", baseName, ".dx80.vtx");
+	AddFileToDownloadsTable(downloadFile);
+	
+	Format(downloadFile, sizeof(downloadFile), "%s%s", baseName, ".dx90.vtx");
+	AddFileToDownloadsTable(downloadFile);
+	
+	Format(downloadFile, sizeof(downloadFile), "%s%s", baseName, ".sw.vtx");
+	AddFileToDownloadsTable(downloadFile);
+	
+	Format(downloadFile, sizeof(downloadFile), "%s%s", baseName, ".phy");
+	AddFileToDownloadsTable(downloadFile);
+	
+	Format(downloadFile, sizeof(downloadFile), "%s%s", baseName, ".vvd");
+	AddFileToDownloadsTable(downloadFile);
+	
+	Format(downloadFile, sizeof(downloadFile), "%s%s", baseName, ".mdl");
+	AddFileToDownloadsTable(downloadFile);
+	
+	strcopy(g_PumpkinModel, sizeof(g_PumpkinModel), downloadFile);
+	PrecacheModel(g_PumpkinModel, true);
 }
 
 public void OnEntityCreated(int entity, const char[] classname) {
@@ -180,7 +207,7 @@ void HauntPumpkin(int pumpkin) {
 		SDKHook(pumpkin, SDKHook_OnTakeDamagePost, SDKHook_OnHauntedPumpkinDestroyed);
 		PreparePumpkinTalkTimer(pumpkin);
 		
-		SetEntityModel(pumpkin, HAUNTED_PUMPKIN_MODEL);
+		SetEntityModel(pumpkin, g_PumpkinModel);
 		
 		// MIRV pumpkin bombs are slightly smaller than their standard counterparts.
 		float flModelScale = pumpkinTeam == TFTeam_Unassigned ? 0.55 : (0.9 * 0.55);
